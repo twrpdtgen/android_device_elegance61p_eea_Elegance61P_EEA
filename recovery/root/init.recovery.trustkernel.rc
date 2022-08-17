@@ -1,0 +1,40 @@
+on property:ro.bootmode=cali
+	mkdir /mnt/vendor/tee_persist
+
+	mount ext4 /dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/tee_persist \
+		/mnt/vendor/tee_persist nosuid noatime nodev \
+		wait noauto_da_alloc
+
+	start mkpersistfsd
+
+on property:vendor.trustkernel.persist_fs.state=wipe
+	# mkfs
+	exec - root root -- /system/bin/mke2fs -t ext4 -b 4096 \
+		/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/tee_persist
+	exec - root root -- /system/bin/e2fsdroid -e -a /mnt/vendor/tee_persist \
+		/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/tee_persist
+
+	# try remount
+	mount ext4 /dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/tee_persist \
+		/mnt/vendor/tee_persist nosuid noatime nodev \
+		wait noauto_da_alloc
+
+	setprop vendor.trustkernel.persist_fs.state remount
+
+on property:vendor.trustkernel.persist_fs.state=ready
+	restorecon /mnt/vendor/tee_persist
+
+	mkdir /mnt/vendor/tee_persist
+
+	restorecon /mnt/vendor/tee_persist/t6
+	chown system system /mnt/vendor/tee_persist/t6
+
+service mkpersistfsd /vendor/bin/mkpersistfsd \
+		--path /mnt/vendor/tee_persist \
+		--dev /dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/tee_persist \
+		--proprefix vendor.trustkernel
+	user system
+	group system
+	class core
+	oneshot
+	disabled
